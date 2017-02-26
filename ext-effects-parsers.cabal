@@ -1,0 +1,31 @@
+name:                ext-effects-parsers
+version:             0.1.0.0
+synopsis:            Monadic Parsers Combinatos library based on Extensible Effects Subclasses             
+license-file:        LICENSE
+author:              Georgiy Lukjanov
+maintainer:          georgiylukjanov@gmail.com           
+category:            Text
+build-type:          Simple
+extra-source-files:  readme.md
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Parsers
+  other-extensions:    FlexibleContexts, TypeOperators
+  build-depends:       base >=4.7,
+                       extensible-effects>= 1.11.0.0,
+                       void >= 0.7
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+test-suite Commom-Parsers-Test
+  type:                exitcode-stdio-1.0
+  main-is:             Tests.hs
+  hs-source-dirs:      tests,
+                       src
+  other-modules:       Parsers
+  build-depends:       base >= 4 && < 5,
+                       extensible-effects>= 1.11.0.0,
+                       HUnit,
+                       tasty >= 0.7,
+                       tasty-hunit
