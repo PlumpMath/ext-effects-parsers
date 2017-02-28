@@ -1,28 +1,26 @@
-{-# LANGUAGE FlexibleContexts
-            , TypeOperators
-            , ExistentialQuantification
-            , ScopedTypeVariables
-            , TypeApplications
-            , ConstraintKinds
-            , RankNTypes #-}
-
-
-{- This module contains common parser combinators
-   inspired by paper Monadic Parser Combinators by
-   Graham Hutton and Erik Meijer -}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Parsers where
 
 import Control.Monad
 import Control.Applicative(pure,(<$>))
-
-import Control.Eff
-import Control.Eff.State.Lazy
-import Control.Eff.Exception
-
-import Data.Void (Void)
+import Control.Monad.Freer
+import Control.Monad.Freer.State
+import Control.Monad.Freer.Exception
 import Data.Maybe
 import Data.Char
+
+type Fail = Exc ()
+
+die :: (Member Fail r) => Eff r a
+die = throwError ()
 
 -- | Parser effects constraint
 type Parsable r = (Member Fail r, Member (State String) r)
@@ -31,23 +29,23 @@ type Parser r a = Parsable r => Eff r a
 
 -- | Run a computation with Fail and State String effects, yielding last state
 --   in case of fail
-parse :: Eff (Fail :> State String :> Void) a -> String -> (String, Maybe a)
-parse p inp = run . runState inp . runFail $ p
+parse :: Eff (Fail ': State String ': '[]) a -> String -> (Either () a, String)
+parse p inp = run $ runState (runError p) inp
 
 -- | Try to apply parser, in case of fail, backtrack and apply second one
 alt :: Parser r a -> Parser r a -> Parser r a
 alt ma mb = do
   s <- get @String
-  catchExc ma $ \(ea :: ()) -> do
+  catchError ma $ \(ea :: ()) -> do
     put s
-    catchExc mb $ \(eb :: ()) -> die
+    catchError mb $ \(eb :: ()) -> throwError ()
 
 -- | Consumes one symbol of any kind
 item :: Parser r Char
 item = do
   s <- get
-  case s of 
-    [] -> put s >> die
+  case s of
+    [] -> put s >> throwError ()
     (x:xs) -> put xs >> pure x
 
 -- | Consumes item only if it satisfies predicate
@@ -55,14 +53,14 @@ sat :: (Char -> Bool) -> Parser r Char
 sat p = do
   s <- get @String
   x <- item
-  if p x then pure x else (put s >> die)
+  if p x then pure x else (put s >> throwError ())
 
 -- | Consumes item only if it is equal to specified char
 char :: Char -> Parser r Char
 char x = sat (\y -> x == y)
 
 lower :: Parser r Char
-lower = sat isLower 
+lower = sat isLower
 
 upper :: Parser r Char
 upper = sat isUpper
@@ -78,7 +76,7 @@ alphanum = letter `alt` digit
 
 -- | Parse a thing enclosed in brackets
 bracket :: Eff r a -> Eff r b -> Eff r c -> Eff r b
-bracket open p close = do 
+bracket open p close = do
   open
   x <- p
   close
@@ -123,3 +121,50 @@ token p = spaces >> p
 -- | Parse a specified string
 string :: String -> Parser r String
 string = mapM char
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+type Document = [Block]
+
+-- |Represents block entity
+data Block = Blank
+           | Header (Int,Line)
+           | Paragraph [Line]
+           | UnorderedList [Line]
+           | BlockQuote [Line]
+  deriving (Show,Eq)
+
+-- |Represents line as list of inline elements (words)
+data Line = Empty | NonEmpty [Inline]
+  deriving (Show,Eq)
+
+-- |Represent inline entity, just a string for this moment
+-- Что делать с пунктуацией и пробелами?
+data Inline = Plain String
+            | Bold String
+            | Italic String
+            | Monospace String
+  deriving (Show,Eq)
+
+-----------------------------------------------------------------
+-------------------Parsers for Inline elements-------------------
+-----------------------------------------------------------------
+
+-------------------Helper Parsers-----------------
+punctuation :: Parser r Char
+punctuation = foldl1 alt (map char marks)
+  where marks = ".,:;!?'-"
+
+alphanumsWithPunctuation :: Parser r String
+alphanumsWithPunctuation = some (alphanum `alt` punctuation)
+
+-- |Sequence of alphanums with punctuations and spaces
+sentence :: Parser r String
+sentence =
+  some (do
+    w <- alphanumsWithPunctuation
+    s <- (many (char ' '))
+    return $ w ++ s
+  ) >>= pure . concat
