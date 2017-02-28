@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleContexts
             , TypeOperators
             , ExistentialQuantification
-            , ScopedTypeVariables 
-            , TypeApplications 
+            , ScopedTypeVariables
+            , TypeApplications
             , ConstraintKinds
             , RankNTypes #-}
 
@@ -29,13 +29,13 @@ type Parsable r = (Member Fail r, Member (State String) r)
 
 type Parser r a = Parsable r => Eff r a
 
--- | Run a computation with Fail and State String effects, yielding last state 
+-- | Run a computation with Fail and State String effects, yielding last state
 --   in case of fail
 parse :: Eff (Fail :> State String :> Void) a -> String -> (String, Maybe a)
 parse p inp = run . runState inp . runFail $ p
 
--- | Try to apply parser, in case of fail, backtrack and apply second one  
-alt :: Parser r a -> Parser r a -> Parser r a 
+-- | Try to apply parser, in case of fail, backtrack and apply second one
+alt :: Parser r a -> Parser r a -> Parser r a
 alt ma mb = do
   s <- get @String
   catchExc ma $ \(ea :: ()) -> do
@@ -84,7 +84,7 @@ bracket open p close = do
   close
   return x
 
--- | Apply parser zero or more times. Similar to @many@ from Control.Applicative 
+-- | Apply parser zero or more times. Similar to @many@ from Control.Applicative
 many :: Parser r a -> Parser r [a]
 many v = many_v
  where
@@ -101,14 +101,14 @@ some v = some_v
 word :: Parser r String
 word = some letter
 
--- | Parse a sequence of entities with first parser, separated by things 
---   parsable with second one 
+-- | Parse a sequence of entities with first parser, separated by things
+--   parsable with second one
 sepby :: Parser r a -> Parser r b -> Parser r [a]
 p `sepby` sep = (p `sepby1` sep) `alt` return []
 
 -- | Same as @sepby@, but sequence must be non-empty
 sepby1 :: Parser r a -> Parser r b -> Parser r [a]
-p `sepby1` sep = do 
+p `sepby1` sep = do
   a <- p
   as <- many (sep >> p)
   return (a:as)

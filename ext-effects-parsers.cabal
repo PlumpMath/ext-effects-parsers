@@ -1,9 +1,9 @@
 name:                ext-effects-parsers
 version:             0.1.0.0
-synopsis:            Monadic Parsers Combinatos library based on Extensible Effects Subclasses             
+synopsis:            Monadic Parsers Combinatos library based on Extensible Effects Subclasses
 license-file:        LICENSE
 author:              Georgiy Lukjanov
-maintainer:          georgiylukjanov@gmail.com           
+maintainer:          georgiylukjanov@gmail.com
 category:            Text
 build-type:          Simple
 extra-source-files:  readme.md
